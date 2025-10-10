@@ -1,5 +1,6 @@
 FROM alpine:edge AS builder
 
+RUN apk upgrade
 RUN apk add --no-cache git nodejs npm python3 make g++
 
 RUN git clone https://github.com/NetrisTV/ws-scrcpy.git /ws-scrcpy
