@@ -18,6 +18,9 @@ jobs:
         with:
           submodules: true
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+        
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -46,4 +49,4 @@ jobs:
             ${{ github.ref == 'refs/heads/main' && 'shmayro/scrcpy-web:latest' || '' }}
             ${{ github.ref == 'refs/heads/main' && format('shmayro/scrcpy-web:{0}', env.DATE) || '' }}
             ${{ github.event_name == 'pull_request' && format('shmayro/scrcpy-web:pr-{0}', env.PR_ID) || '' }}
-          platforms: linux/amd64,linux/arm64v8
+          platforms: linux/amd64,linux/arm64
