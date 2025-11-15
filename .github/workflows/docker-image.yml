@@ -46,4 +46,4 @@ jobs:
             ${{ github.ref == 'refs/heads/main' && 'shmayro/scrcpy-web:latest' || '' }}
             ${{ github.ref == 'refs/heads/main' && format('shmayro/scrcpy-web:{0}', env.DATE) || '' }}
             ${{ github.event_name == 'pull_request' && format('shmayro/scrcpy-web:pr-{0}', env.PR_ID) || '' }}
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64

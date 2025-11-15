@@ -1,4 +1,4 @@
-FROM alpine:edge AS builder
+FROM alpine:3.20 AS builder
 
 RUN apk add --no-cache git nodejs npm python3 make g++
 
@@ -11,7 +11,7 @@ RUN npm run dist
 WORKDIR dist
 RUN npm install
 
-FROM alpine:edge AS runner
+FROM alpine:3.20 AS runner
 LABEL maintainer="Haroun EL ALAMI <haroun.dev@gmail.com>"
 
 RUN apk add --no-cache android-tools npm
