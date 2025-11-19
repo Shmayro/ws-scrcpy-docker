@@ -92,12 +92,15 @@ jobs:
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
+          ls -la
+          find . -type f
+
           tags=""
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            tags="$tags shmayro/scrcpy-web:latest shmayro/scrcpy-web:${{ env.DATE }}"
+            tags="--tag shmayro/scrcpy-web:latest --tag shmayro/scrcpy-web:${{ env.DATE }}"
           fi
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            tags="$tags shmayro/scrcpy-web:pr-${{ env.PR_ID }}"
+            tags="--tag shmayro/scrcpy-web:pr-${{ env.PR_ID }}"
           fi
           docker buildx imagetools create $tags $(printf 'shmayro/scrcpy-web@sha256:%s ' *)
 
