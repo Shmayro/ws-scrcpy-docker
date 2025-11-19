@@ -51,7 +51,7 @@ jobs:
       - name: Upload digest
         uses: actions/upload-artifact@v5
         with:
-          name: digests-${{ matrix.platform }}
+          name: digests-${{ replace(matrix.platform, '/', '-') }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
