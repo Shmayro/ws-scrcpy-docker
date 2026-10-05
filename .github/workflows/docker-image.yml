@@ -1,4 +1,4 @@
-name: Build and Push Docker Image to Docker Hub
+name: Build and Publish Docker Image
 
 on:
   push:
@@ -6,7 +6,10 @@ on:
   pull_request:
     branches: [ main ]
   release:
-    types: [ created ]
+    types: [ published ]
+
+env:
+  IMAGE_NAME: shmayro/scrcpy-web
 
 jobs:
   build:
@@ -29,6 +32,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -40,9 +44,10 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}
-          outputs: type=image,name=shmayro/scrcpy-web,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=${{ github.event_name != 'pull_request' }}
 
       - name: Export digest
+        if: github.event_name != 'pull_request'
         run: |
           mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
@@ -52,6 +57,7 @@ jobs:
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
 
       - name: Upload digest
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v5
         with:
           name: digests-${{ env.PLATFORM_PAIR }}
@@ -62,6 +68,7 @@ jobs:
   merge:
     runs-on: ubuntu-latest
     needs: build
+    if: github.event_name != 'pull_request'
     steps:
       - name: Download digests
         uses: actions/download-artifact@v6
@@ -79,35 +86,54 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Get current date
-        if: github.ref == 'refs/heads/main'
-        id: date
-        run: echo "DATE=$(date +'%d-%m-%y')" >> $GITHUB_ENV
+      - name: Prepare Docker metadata
+        id: meta
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          SHA: ${{ github.sha }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease || 'false' }}
+        run: |
+          python3 <<'PY' >> "$GITHUB_OUTPUT"
+          import os
+          import re
 
-      - name: Get Pull Request ID
-        if: github.event_name == 'pull_request'
-        id: pr
-        run: echo "PR_ID=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+          image = os.environ["IMAGE_NAME"]
+          event_name = os.environ["EVENT_NAME"]
+          ref_name = os.environ["REF_NAME"]
+          ref_type = os.environ["REF_TYPE"]
+          sha = os.environ["SHA"]
+          prerelease = os.environ.get("RELEASE_PRERELEASE", "false").lower() == "true"
+
+          tags = []
+
+          if event_name == "push" and ref_type == "branch" and ref_name == "main":
+              tags.extend([f"{image}:edge", f"{image}:sha-{sha[:7]}"])
+          elif event_name == "release":
+              version = ref_name.removeprefix("v")
+              tags.append(f"{image}:{version}")
+
+              stable = re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version)
+              if stable:
+                  major, minor, _patch = version.split(".")
+                  tags.extend([
+                      f"{image}:{major}.{minor}",
+                      f"{image}:{major}",
+                  ])
+                  if not prerelease:
+                      tags.append(f"{image}:latest")
+
+          print("tags=" + " ".join(f"--tag {tag}" for tag in dict.fromkeys(tags)))
+          print("first=" + (tags[0] if tags else ""))
+          PY
 
       - name: Create manifest list and push
         working-directory: /tmp/digests
         run: |
-          ls -la
-          find . -type f
-
-          tags=""
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            tags="--tag shmayro/scrcpy-web:latest --tag shmayro/scrcpy-web:${{ env.DATE }}"
-          fi
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            tags="--tag shmayro/scrcpy-web:pr-${{ env.PR_ID }}"
-          fi
-          docker buildx imagetools create $tags $(printf 'shmayro/scrcpy-web@sha256:%s ' *)
+          docker buildx imagetools create ${{ steps.meta.outputs.tags }} $(printf '${{ env.IMAGE_NAME }}@sha256:%s ' *)
 
       - name: Inspect image
         run: |
-          tag="latest"
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            tag="pr-${{ env.PR_ID }}"
-          fi
-          docker buildx imagetools inspect shmayro/scrcpy-web:${tag}
+          docker buildx imagetools inspect ${{ steps.meta.outputs.first }}
