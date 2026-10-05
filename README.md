@@ -56,3 +56,16 @@ services:
 scrcpy-web uses GitHub Releases as the source of truth for stable versions. Publishing a release such as `v1.2.3` creates matching multi-arch (`linux/amd64`, `linux/arm64`) Docker image tags: `1.2.3`, `1.2`, `1`, and `latest`.
 
 Builds from the `main` branch are published as development images using `edge` and `sha-<short-sha>` tags.
+
+### Audio
+
+The web client does not stream audio. Upstream [ws-scrcpy](https://github.com/NetrisTV/ws-scrcpy) has no audio support, and its maintainer has no plans to add it ([NetrisTV/ws-scrcpy#380](https://github.com/NetrisTV/ws-scrcpy/issues/380)).
+
+The Android side does produce audio, so if you need sound, use the native [scrcpy](https://github.com/Genymobile/scrcpy) client (v2.0+), which forwards audio over ADB:
+
+```bash
+adb connect localhost:5555
+scrcpy -s localhost:5555
+```
+
+On Android 11 (the [dockerify-android](https://github.com/Shmayro/dockerify-android) image), the device must be unlocked when scrcpy starts, otherwise audio capture fails.
